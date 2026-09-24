@@ -1,0 +1,53 @@
+plugins {
+    id 'java'
+}
+
+group 'ru.ifmo'
+version '1.0'
+
+repositories {
+    mavenCentral()
+}
+
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+    }
+}
+
+dependencies {
+    implementation files('lib/fastcgi-lib.jar')
+}
+
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'FastCGIServer'
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+
+task deploy(type: Exec) {
+    dependsOn 'jar'
+
+    def localJarPath = tasks.jar.archiveFile.get().asFile.absolutePath
+    def remoteServer = "s502873@helios.cs.ifmo.ru"
+    def remotePort = "2222"
+
+    // Пути на сервере
+    def remoteBinDest = "${remoteServer}:/home/studs/s502873/httpd-root/fcgi-bin/hello-world.jar"
+    def remotePublicDest = "${remoteServer}:/home/studs/s502873/httpd-root/.www/"
+
+    // Путь к твоей локальной папке со статикой (измени на свою, например 'src/frontend' или '../site')
+    def localPublicDir = '../site/.'
+
+    // Сначала отправляем jar-ник, а затем сразу пачкой все файлы статики через scp -r
+    commandLine 'sh', '-c', "scp -P ${remotePort} -o StrictHostKeyChecking=no ${localJarPath} ${remoteBinDest} && scp -P ${remotePort} -o StrictHostKeyChecking=no -r ${localPublicDir} ${remotePublicDest}"
+}
